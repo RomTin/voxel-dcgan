@@ -155,7 +155,9 @@ class Generator(object):
                 'h2': weight_variable([4, 4, 4, 64, 128]),
                 'h3': weight_variable([4, 4, 4, 32, 64]),
                 'h4': weight_variable([4, 4, 4, 16, 32]),
-                'h5': weight_variable([4, 4, 4, 1, 16])
+                'h5': weight_variable([4, 4, 4, 8, 16]),
+                'h6': weight_variable([4, 4, 4, 4, 8]),
+                'h7': weight_variable([4, 4, 4, 1, 4])
             }
 
             self.b = {
@@ -170,7 +172,9 @@ class Generator(object):
         h = tf.nn.relu(vbn(deconv3d(h, self.W['h2'], [shape[0], 4, 4, 4, 64]), 'g_vbn_2'))
         h = tf.nn.relu(vbn(deconv3d(h, self.W['h3'], [shape[0], 8, 8, 8, 32]), 'g_vbn_3'))
         h = tf.nn.relu(vbn(deconv3d(h, self.W['h4'], [shape[0], 16, 16, 16, 16]), 'g_vbn_4'))
-        x = tf.nn.tanh(deconv3d(h, self.W['h5'], [shape[0], 32, 32, 32, 1]) + self.b['h5'])
+        h = tf.nn.relu(vbn(deconv3d(h, self.W['h5'], [shape[0], 32, 32, 32, 8]), 'g_vbn_5'))
+        h = tf.nn.relu(vbn(deconv3d(h, self.W['h6'], [shape[0], 64, 64, 64, 4]), 'g_vbn_6'))
+        x = tf.nn.tanh(deconv3d(h, self.W['h7'], [shape[0], 128, 128, 128, 1]) + self.b['h5'])
         return x
 
 class Discriminator(object):
@@ -182,32 +186,39 @@ class Discriminator(object):
             self.dim_per_kernel = 50
 
             self.W = {
-                'h1': weight_variable([4, 4, 4, 1, 16]),
-                'h2': weight_variable([4, 4, 4, 16, 32]),
-                'h3': weight_variable([4, 4, 4, 32, 64]),
-                'h4': weight_variable([4, 4, 4, 64, 128]),
-                'h5': weight_variable([2*2*2*128+self.n_kernels, 2]),
+                'h1': weight_variable([4, 4, 4, 1, 4]),
+                'h2': weight_variable([4, 4, 4, 4, 8]),
+                'h3': weight_variable([4, 4, 4, 8, 16]),
+                'h4': weight_variable([4, 4, 4, 16, 32]),
+                'h5': weight_variable([4, 4, 4, 32, 64]),
+                'h6': weight_variable([4, 4, 4, 64, 128]),
+                'h7': weight_variable([2*2*2*128+self.n_kernels, 2]),
                 'md': weight_variable([2*2*2*128, self.n_kernels*self.dim_per_kernel])
             }
 
             self.b = {
-                'h1': bias_variable([16]),
-                'h5': bias_variable([2]),
+                'h1': bias_variable([4]),
+                'h7': bias_variable([2]),
                 'md': bias_variable([self.n_kernels])
             }
 
-            self.bn2 = BatchNormalization([32], 'bn2')
-            self.bn3 = BatchNormalization([64], 'bn3')
-            self.bn4 = BatchNormalization([128], 'bn4')
+            self.bn2 = BatchNormalization([8], 'bn2')
+            self.bn3 = BatchNormalization([16], 'bn3')
+            self.bn4 = BatchNormalization([32], 'bn4')
+            self.bn5 = BatchNormalization([64], 'bn5')
+            self.bn6 = BatchNormalization([128], 'bn6')
 
     def __call__(self, x, train):
+        print x
         shape = x.get_shape().as_list()
-        noisy_x = x + tf.random_normal([shape[0], 32, 32, 32, 1])
+        noisy_x = x + tf.random_normal([shape[0], 128, 128, 128, 1])
 
         h = lrelu(conv3d(noisy_x, self.W['h1']) + self.b['h1'])
         h = lrelu(self.bn2(conv3d(h, self.W['h2']), train))
         h = lrelu(self.bn3(conv3d(h, self.W['h3']), train))
         h = lrelu(self.bn4(conv3d(h, self.W['h4']), train))
+        h = lrelu(self.bn5(conv3d(h, self.W['h5']), train))
+        h = lrelu(self.bn6(conv3d(h, self.W['h6']), train))
         h = tf.reshape(h, [-1, 2*2*2*128])
 
         m = tf.matmul(h, self.W['md'])
@@ -216,5 +227,5 @@ class Discriminator(object):
         f = tf.reduce_sum(tf.exp(-abs_dif), 2) + self.b['md']
 
         h = tf.concat(1, [h, f])
-        y = tf.matmul(h, self.W['h5']) + self.b['h5']
+        y = tf.matmul(h, self.W['h7']) + self.b['h7']
         return y

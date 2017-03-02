@@ -13,7 +13,7 @@ beta1 = 0.5
 z_size = 100
 save_interval = 1
 
-x = tf.placeholder(tf.float32, [batch_size, 32, 32, 32, 1])
+x = tf.placeholder(tf.float32, [batch_size, 128, 128, 128, 1])
 z = tf.placeholder(tf.float32, [batch_size, z_size])
 train = tf.placeholder(tf.bool)
 
@@ -30,9 +30,9 @@ label_fake = np.zeros([batch_size, 2], dtype=np.float32)
 label_real[:, 0] = 1
 label_fake[:, 1] = 1
 
-loss_G = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y_, tf.constant(label_real)))
-loss_D = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y_, tf.constant(label_fake)))
-loss_D += tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(y, tf.constant(label_real)))
+loss_G = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y_, labels=tf.constant(label_real)))
+loss_D = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y_, labels=tf.constant(label_fake)))
+loss_D += tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=y, labels=tf.constant(label_real)))
 
 var_G = [v for v in tf.trainable_variables() if 'g_' in v.name]
 var_D = [v for v in tf.trainable_variables() if 'd_' in v.name]
@@ -69,7 +69,7 @@ with tf.Session(config=config) as sess:
         voxels = sess.run(x_, feed_dict={z:batch_z})
 
         for j, v in enumerate(voxels[:5]):
-            v = v.reshape([32, 32, 32]) > 0
+            v = v.reshape([128, 128, 128]) > 0
             util.save_binvox(v, "out/epoch{0}-{1}.binvox".format(epoch, j))
 
         if epoch % save_interval == 0:

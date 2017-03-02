@@ -1,2 +1,2 @@
-dataset_path = ""
+dataset_path = "./data/"
 params_path = ""
